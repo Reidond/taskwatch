@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.wrangler/
+
+# Local env files
+.env
+.env.local
+.env.*.local
+.dev.vars
+
+# Bun
+bun.lockb
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# D1 local database
+.mf/
+
+*.tsbuildinfo
