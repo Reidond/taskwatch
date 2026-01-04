@@ -105,7 +105,7 @@ Tasks are often vague (just a title, or poorly written description). The agent p
 
 ```
 NEW → PLANNING → PLAN_READY
-PLAN_READY → (PLAN_REVISION → PLANNING) or PLAN_APPROVED  
+PLAN_READY → (PLAN_REVISION → PLANNING) or PLAN_APPROVED
 PLAN_APPROVED → IMPLEMENTING → PR_READY
 PR_READY → DONE (when all MRs merged)
 
@@ -495,7 +495,7 @@ Sections:
 1. **ClickUp Info** — title, description, status, link to ClickUp
 2. **Plan** — current version with:
    - Assumptions (markdown)
-   - Approach (markdown)  
+   - Approach (markdown)
    - File changes (git status style per repo)
 3. **Feedback Thread** — conversation trail of feedback + revisions
 4. **Actions** — "Add Feedback", "Approve Plan", "Implement"
@@ -510,8 +510,8 @@ Sections:
 - Export format is CSV only for MVP
 
 ## Approach
-Add an export button to the reports page that triggers a backend 
-endpoint to generate CSV. The endpoint streams the response to 
+Add an export button to the reports page that triggers a backend
+endpoint to generate CSV. The endpoint streams the response to
 handle large datasets.
 
 ## File Changes
@@ -689,7 +689,7 @@ Working directories:
 ### Assumptions
 [assumptions from approved plan]
 
-### Approach  
+### Approach
 [approach from approved plan]
 
 ### Expected File Changes
@@ -867,34 +867,47 @@ Low risk environment:
 
 ## 18. MVP Milestones
 
-### Milestone 1: Foundation
-- [ ] Monorepo setup (Bun workspaces)
-- [ ] Cloudflare Worker with D1
-- [ ] Basic dashboard (task list from D1)
-- [ ] ClickUp polling → tasks in D1
+### Milestone 1: Foundation ✅
+- [x] Monorepo setup (Bun workspaces)
+- [x] Cloudflare Worker with D1 + Hono
+- [x] D1 schema with all tables (tasks, plans, runs, MRs, worktrees, push_subscriptions)
+- [x] ClickUp polling service (read-only, 5-min cron)
+- [x] Basic dashboard (Vite + React + TanStack Router/Query)
+- [x] Task list and task detail pages
+- [x] Daemon structure with job polling, git worktree, GitLab MR, opencode clients
 
-### Milestone 2: Planning
-- [ ] Daemon basic structure
-- [ ] Opencode SDK integration
-- [ ] Plan generation flow
-- [ ] Dashboard: view plan, add feedback, revision loop
+### Milestone 2: End-to-End Planning Flow
+- [ ] Authentication: better-auth with GitLab OAuth
+- [ ] Daemon: test connection to orchestrator API
+- [ ] Daemon: implement plan job execution with opencode
+- [ ] Dashboard: manual "Generate Plan" trigger working end-to-end
+- [ ] Dashboard: plan display with assumptions, approach, file changes
+- [ ] Dashboard: feedback submission triggers re-planning
+- [ ] Dashboard: plan approval flow
+- [ ] Real-time: run status polling/refresh in dashboard
 
-### Milestone 3: Approval & Implementation
-- [ ] Plan approval in dashboard
-- [ ] Worktree creation
-- [ ] Implementation via opencode
-- [ ] MR creation on GitLab
+### Milestone 3: Implementation Flow
+- [ ] Daemon: implement job execution with opencode
+- [ ] Daemon: git commit and push to branch
+- [ ] Daemon: GitLab MR creation with plan summary
+- [ ] Dashboard: implementation trigger after plan approval
+- [ ] Dashboard: MR links display with status
+- [ ] Error handling: partial failures, draft MRs
 
 ### Milestone 4: Completion Loop
-- [ ] GitLab webhook for MR status
-- [ ] Task marked DONE when all MRs merged
-- [ ] Worktree cleanup via dashboard
+- [ ] GitLab webhook receiver for MR events
+- [ ] Auto-update MR status (open → merged/closed)
+- [ ] Task auto-transition to DONE when all MRs merged
+- [ ] Worktree cleanup triggers from dashboard
+- [ ] Daemon: worktree removal command
 
 ### Milestone 5: Notifications & Polish
-- [ ] PWA setup
-- [ ] Push notifications (plan ready, MR created, blocked)
-- [ ] Daemon status indicator
-- [ ] Error handling improvements
+- [ ] Web Push: VAPID key generation and storage
+- [ ] Web Push: subscription management in dashboard
+- [ ] Web Push: notifications for plan ready, MR created, blocked
+- [ ] Daemon status indicator in dashboard (heartbeat)
+- [ ] Error recovery improvements
+- [ ] Run logs viewer with streaming
 
 ---
 
@@ -968,7 +981,7 @@ AUTH_EMAIL_WHITELIST=       # Comma-separated emails
 
 ---
 
-## 22. Future Enhancements
+## 23. Future Enhancements
 
 - [ ] ClickUp webhooks (reduce polling)
 - [ ] ClickUp write-back (update status, add MR links as comments)
