@@ -16,7 +16,6 @@ bun.lockb
 
 # IDE
 .idea/
-.vscode/
 *.swp
 *.swo
 
