@@ -31,3 +31,4 @@ Thumbs.db
 .mf/
 
 *.tsbuildinfo
+.tanstack/
