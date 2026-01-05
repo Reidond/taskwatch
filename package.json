@@ -3,7 +3,7 @@
 	"private": true,
 	"workspaces": ["apps/*", "packages/*"],
 	"scripts": {
-		"dev": "bun run --filter './apps/*' dev",
+		"dev": "bun --filter '!@taskwatch/daemon' dev",
 		"dev:api": "bun run --filter './apps/api' dev",
 		"dev:web": "bun run --filter './apps/web2' dev",
 		"dev:daemon": "bun run --filter './apps/daemon' dev",
