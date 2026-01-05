@@ -15,7 +15,7 @@ taskwatch/
 ├── apps/
 │   ├── api/           # CF Worker + Hono + D1
 │   ├── daemon/        # Bun CLI, polls API, runs opencode
-│   └── web/           # React + TanStack + Tailwind PWA
+│   └── web2/          # React + TanStack + shadcn/ui PWA
 ├── packages/
 │   └── shared/        # Types, Zod schemas, API contracts
 ├── SPEC.md            # Full product specification
@@ -28,7 +28,7 @@ taskwatch/
 | Task | Location | Notes |
 |------|----------|-------|
 | Add API endpoint | `apps/api/src/routes/` | One file per resource, mount in index.ts |
-| Add dashboard page | `apps/web/src/routes/` | TanStack Router file-based routing |
+| Add dashboard page | `apps/web2/src/routes/` | TanStack Router file-based routing |
 | Add shared type | `packages/shared/src/types.ts` | Export via package.json |
 | Add Zod schema | `packages/shared/src/schemas.ts` | Validation schemas |
 | Daemon job type | `apps/daemon/src/daemon.ts` | Plan/Implement job handlers |
