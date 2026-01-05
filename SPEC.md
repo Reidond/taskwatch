@@ -248,6 +248,8 @@ When a task affects multiple repos:
 ### 9.2 Frontend
 - Vite + React
 - TanStack: Router, Query, Table, Form
+- shadcn/ui: UI component library (Card, Button, Badge, etc.)
+- Tailwind CSS v4 with CSS variables for theming
 - PWA with Service Worker (for push notifications)
 - `better-auth` for GitLab OAuth
 
@@ -278,12 +280,14 @@ When a task affects multiple repos:
   package.json
   bun.lockb
   apps/
-    web/                    # Vite React PWA
+    web2/                   # Vite React PWA with shadcn/ui
       package.json
       vite.config.ts
+      components.json       # shadcn/ui config
       src/
         components/
-        pages/
+          ui/               # shadcn/ui components
+        routes/             # TanStack Router pages
         service-worker.ts   # Push notifications
     api/                    # Cloudflare Worker
       package.json
