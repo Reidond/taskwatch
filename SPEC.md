@@ -880,15 +880,16 @@ Low risk environment:
 - [x] Task list and task detail pages
 - [x] Daemon structure with job polling, git worktree, GitLab MR, opencode clients
 
-### Milestone 2: End-to-End Planning Flow
-- [ ] Authentication: better-auth with GitLab OAuth
-- [ ] Daemon: test connection to orchestrator API
-- [ ] Daemon: implement plan job execution with opencode
-- [ ] Dashboard: manual "Generate Plan" trigger working end-to-end
-- [ ] Dashboard: plan display with assumptions, approach, file changes
-- [ ] Dashboard: feedback submission triggers re-planning
-- [ ] Dashboard: plan approval flow
-- [ ] Real-time: run status polling/refresh in dashboard
+### Milestone 2: End-to-End Planning Flow ✅
+- [x] Authentication: better-auth with GitLab OAuth
+- [x] Daemon: test connection to orchestrator API
+- [x] Daemon: implement plan job execution with opencode
+- [x] Dashboard: manual "Generate Plan" trigger working end-to-end
+- [x] Dashboard: plan display with assumptions, approach, file changes
+- [x] Dashboard: feedback submission triggers re-planning
+- [x] Dashboard: plan approval flow
+- [x] Real-time: run status polling/refresh in dashboard
+- [x] Daemon heartbeat and online/offline status in dashboard
 
 ### Milestone 3: Implementation Flow
 - [ ] Daemon: implement job execution with opencode
@@ -909,7 +910,7 @@ Low risk environment:
 - [ ] Web Push: VAPID key generation and storage
 - [ ] Web Push: subscription management in dashboard
 - [ ] Web Push: notifications for plan ready, MR created, blocked
-- [ ] Daemon status indicator in dashboard (heartbeat)
+- [x] Daemon status indicator in dashboard (heartbeat) - moved to M2
 - [ ] Error recovery improvements
 - [ ] Run logs viewer with streaming
 
