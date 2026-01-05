@@ -31,3 +31,5 @@ Thumbs.db
 
 *.tsbuildinfo
 .tanstack/
+better-auth/
+better-auth-repo/
