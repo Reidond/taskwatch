@@ -1,5 +1,6 @@
 import type {
 	ApprovePlanResponse,
+	ClickUpWorkspaceListResponse,
 	GeneratePlanResponse,
 	ImplementResponse,
 	MergeRequestListResponse,
@@ -112,6 +113,28 @@ export async function unsubscribePush(endpoint: string): Promise<void> {
 		method: 'DELETE',
 		body: JSON.stringify({ endpoint }),
 	})
+}
+
+export async function getClickUpWorkspaces(): Promise<ClickUpWorkspaceListResponse> {
+	return fetchApi('/clickup/workspaces')
+}
+
+export async function enableClickUpWorkspace(
+	teamId: string,
+	name?: string,
+): Promise<void> {
+	await fetchApi(`/clickup/workspaces/${teamId}/enable`, {
+		method: 'POST',
+		body: JSON.stringify(name ? { name } : {}),
+	})
+}
+
+export async function disableClickUpWorkspace(teamId: string): Promise<void> {
+	await fetchApi(`/clickup/workspaces/${teamId}/disable`, { method: 'POST' })
+}
+
+export async function disconnectClickUp(): Promise<void> {
+	await fetchApi('/clickup/disconnect', { method: 'POST' })
 }
 
 export interface DaemonStatusResponse {

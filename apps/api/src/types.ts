@@ -1,8 +1,8 @@
 export interface Env {
 	DB: D1Database
-	CLICKUP_API_TOKEN: string
-	CLICKUP_TEAM_ID: string
-	CLICKUP_ANDRIY_USER_ID: string
+	BETTER_AUTH_SECRET: string
+	CLICKUP_CLIENT_ID: string
+	CLICKUP_CLIENT_SECRET: string
 	GITLAB_WEBHOOK_SECRET: string
 	DAEMON_AUTH_TOKEN: string
 	VAPID_PUBLIC_KEY: string

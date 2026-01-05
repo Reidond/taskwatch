@@ -1,58 +1,105 @@
 import type { ClickUpTask } from '@taskwatch/shared/types'
+import { createAuth } from '../lib/auth'
+import type { Auth } from '../lib/auth'
 import type { Env } from '../types'
-import { getTaskByClickUpId, updateTaskStatus, upsertTask } from './db'
+import {
+	getClickUpAccounts,
+	getEnabledClickUpWorkspaces,
+	getTaskByClickUpId,
+	updateTaskStatus,
+	upsertTask,
+} from './db'
 
 const CLICKUP_API_BASE = 'https://api.clickup.com/api/v2'
 
-interface ClickUpListTasksResponse {
-	tasks: ClickUpTask[]
+interface FetchTasksParams {
+	accessToken: string
+	teamId: string
+	clickupUserId: string
 }
 
 export async function syncClickUpTasks(env: Env): Promise<void> {
-	const tasks = await fetchAssignedTasks(env)
+	const auth = createAuth(env)
+	const accounts = await getClickUpAccounts(env.DB)
 
-	for (const clickupTask of tasks) {
-		const existingTask = await getTaskByClickUpId(env.DB, clickupTask.id)
+	for (const account of accounts) {
+		const enabledWorkspaces = await getEnabledClickUpWorkspaces(
+			env.DB,
+			account.userId,
+		)
 
-		const normalizedTask = {
-			clickupTaskId: clickupTask.id,
-			title: clickupTask.name,
-			descriptionMd: clickupTask.description,
-			clickupStatus: clickupTask.status.status.toLowerCase(),
-			assigneeId: clickupTask.assignees[0]?.id?.toString() ?? null,
-			url: clickupTask.url,
-			status: existingTask?.status ?? ('NEW' as const),
-			updatedAtClickup: clickupTask.date_updated,
+		if (enabledWorkspaces.length === 0) {
+			continue
 		}
 
-		await upsertTask(env.DB, normalizedTask)
+		const accessToken = await getAccessTokenForUser(auth, account.userId)
+		if (!accessToken) {
+			console.warn(`No ClickUp access token for user ${account.userId}`)
+			continue
+		}
 
-		if (
-			existingTask &&
-			existingTask.status === 'DONE' &&
-			isEligibleStatus(clickupTask.status.status)
-		) {
-			await updateTaskStatus(env.DB, existingTask.id, 'NEW')
+		for (const workspace of enabledWorkspaces) {
+			const tasks = await fetchAssignedTasks({
+				accessToken,
+				teamId: workspace.clickupTeamId,
+				clickupUserId: account.accountId,
+			})
+
+			for (const clickupTask of tasks) {
+				const existingTask = await getTaskByClickUpId(
+					env.DB,
+					clickupTask.id,
+					account.userId,
+				)
+
+				const normalizedTask = {
+					userId: account.userId,
+					clickupTaskId: clickupTask.id,
+					title: clickupTask.name,
+					descriptionMd: clickupTask.description,
+					clickupStatus: clickupTask.status.status.toLowerCase(),
+					assigneeId: clickupTask.assignees[0]?.id?.toString() ?? null,
+					url: clickupTask.url,
+					status: existingTask?.status ?? ('NEW' as const),
+					updatedAtClickup: clickupTask.date_updated,
+				}
+
+				await upsertTask(env.DB, normalizedTask)
+
+				if (
+					existingTask &&
+					existingTask.status === 'DONE' &&
+					isEligibleStatus(clickupTask.status.status)
+				) {
+					await updateTaskStatus(env.DB, existingTask.id, 'NEW', account.userId)
+				}
+			}
 		}
 	}
 }
 
-async function fetchAssignedTasks(env: Env): Promise<ClickUpTask[]> {
+async function fetchAssignedTasks(
+	params: FetchTasksParams,
+): Promise<ClickUpTask[]> {
+	const { accessToken, teamId, clickupUserId } = params
 	const allTasks: ClickUpTask[] = []
 
-	const listsResponse = await fetch(
-		`${CLICKUP_API_BASE}/team/${env.CLICKUP_TEAM_ID}/space?archived=false`,
+	const spacesResponse = await fetch(
+		`${CLICKUP_API_BASE}/team/${teamId}/space?archived=false`,
 		{
-			headers: { Authorization: env.CLICKUP_API_TOKEN },
+			headers: { Authorization: accessToken },
 		},
 	)
 
-	if (!listsResponse.ok) {
-		console.error('Failed to fetch ClickUp spaces:', await listsResponse.text())
+	if (!spacesResponse.ok) {
+		console.error(
+			'Failed to fetch ClickUp spaces:',
+			await spacesResponse.text(),
+		)
 		return []
 	}
 
-	const spacesData = (await listsResponse.json()) as {
+	const spacesData = (await spacesResponse.json()) as {
 		spaces: Array<{ id: string }>
 	}
 
@@ -60,36 +107,45 @@ async function fetchAssignedTasks(env: Env): Promise<ClickUpTask[]> {
 		const foldersResponse = await fetch(
 			`${CLICKUP_API_BASE}/space/${space.id}/folder?archived=false`,
 			{
-				headers: { Authorization: env.CLICKUP_API_TOKEN },
+				headers: { Authorization: accessToken },
 			},
 		)
 
-		if (!foldersResponse.ok) continue
+		if (foldersResponse.ok) {
+			const foldersData = (await foldersResponse.json()) as {
+				folders: Array<{ id: string; lists: Array<{ id: string }> }>
+			}
 
-		const foldersData = (await foldersResponse.json()) as {
-			folders: Array<{ id: string; lists: Array<{ id: string }> }>
-		}
-
-		for (const folder of foldersData.folders) {
-			for (const list of folder.lists) {
-				const tasks = await fetchTasksFromList(env, list.id)
-				allTasks.push(...tasks)
+			for (const folder of foldersData.folders) {
+				for (const list of folder.lists) {
+					const tasks = await fetchTasksFromList(
+						accessToken,
+						list.id,
+						clickupUserId,
+					)
+					allTasks.push(...tasks)
+				}
 			}
 		}
 
-		const folderlessListsResponse = await fetch(
+		const listsResponse = await fetch(
 			`${CLICKUP_API_BASE}/space/${space.id}/list?archived=false`,
 			{
-				headers: { Authorization: env.CLICKUP_API_TOKEN },
+				headers: { Authorization: accessToken },
 			},
 		)
 
-		if (folderlessListsResponse.ok) {
-			const listsData = (await folderlessListsResponse.json()) as {
+		if (listsResponse.ok) {
+			const listsData = (await listsResponse.json()) as {
 				lists: Array<{ id: string }>
 			}
+
 			for (const list of listsData.lists) {
-				const tasks = await fetchTasksFromList(env, list.id)
+				const tasks = await fetchTasksFromList(
+					accessToken,
+					list.id,
+					clickupUserId,
+				)
 				allTasks.push(...tasks)
 			}
 		}
@@ -97,20 +153,20 @@ async function fetchAssignedTasks(env: Env): Promise<ClickUpTask[]> {
 
 	return allTasks.filter(
 		(task) =>
-			task.assignees.some(
-				(a) => a.id.toString() === env.CLICKUP_ANDRIY_USER_ID,
-			) && isEligibleStatus(task.status.status),
+			task.assignees.some((a) => a.id.toString() === clickupUserId) &&
+			isEligibleStatus(task.status.status),
 	)
 }
 
 async function fetchTasksFromList(
-	env: Env,
+	accessToken: string,
 	listId: string,
+	clickupUserId: string,
 ): Promise<ClickUpTask[]> {
 	const response = await fetch(
-		`${CLICKUP_API_BASE}/list/${listId}/task?assignees[]=${env.CLICKUP_ANDRIY_USER_ID}&include_closed=false`,
+		`${CLICKUP_API_BASE}/list/${listId}/task?assignees[]=${clickupUserId}&include_closed=false`,
 		{
-			headers: { Authorization: env.CLICKUP_API_TOKEN },
+			headers: { Authorization: accessToken },
 		},
 	)
 
@@ -122,7 +178,7 @@ async function fetchTasksFromList(
 		return []
 	}
 
-	const data = (await response.json()) as ClickUpListTasksResponse
+	const data = (await response.json()) as { tasks: ClickUpTask[] }
 	return data.tasks
 }
 
@@ -137,10 +193,16 @@ function isEligibleStatus(status: string): boolean {
 
 export async function fetchTaskComments(
 	env: Env,
+	userId: string,
 	taskId: string,
 ): Promise<string[]> {
+	const accessToken = await getClickUpAccessToken(env, userId)
+	if (!accessToken) {
+		return []
+	}
+
 	const response = await fetch(`${CLICKUP_API_BASE}/task/${taskId}/comment`, {
-		headers: { Authorization: env.CLICKUP_API_TOKEN },
+		headers: { Authorization: accessToken },
 	})
 
 	if (!response.ok) {
@@ -156,4 +218,32 @@ export async function fetchTaskComments(
 	}
 
 	return data.comments.map((c) => c.comment_text)
+}
+
+export async function getClickUpAccessToken(
+	env: Env,
+	userId: string,
+): Promise<string | null> {
+	const auth = createAuth(env)
+	return getAccessTokenForUser(auth, userId)
+}
+
+async function getAccessTokenForUser(
+	auth: Auth,
+	userId: string,
+): Promise<string | null> {
+	try {
+		const tokenResponse = await auth.api.getAccessToken({
+			body: { providerId: 'clickup', userId },
+		})
+
+		const accessToken =
+			(tokenResponse as { accessToken?: string }).accessToken ||
+			(tokenResponse as { data?: { accessToken?: string } }).data?.accessToken
+
+		return accessToken ?? null
+	} catch (error) {
+		console.error('Failed to get ClickUp access token', error)
+		return null
+	}
 }

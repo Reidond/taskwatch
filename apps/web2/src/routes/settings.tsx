@@ -1,6 +1,14 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { subscribePush, unsubscribePush } from '@/lib/api'
+import { authClient } from '@/lib/auth-client'
+import {
+	clickUpWorkspacesQueryOptions,
+	useDisableClickUpWorkspace,
+	useDisconnectClickUp,
+	useEnableClickUpWorkspace,
+} from '@/lib/queries'
+import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 
@@ -12,6 +20,17 @@ function SettingsPage() {
 	const [pushSupported, setPushSupported] = useState(false)
 	const [pushEnabled, setPushEnabled] = useState(false)
 	const [loading, setLoading] = useState(true)
+
+	const {
+		data: clickUpData,
+		error: clickUpError,
+		refetch: refetchClickUp,
+		isLoading: isClickUpLoading,
+	} = useQuery({ ...clickUpWorkspacesQueryOptions, retry: false })
+
+	const enableWorkspace = useEnableClickUpWorkspace()
+	const disableWorkspace = useDisableClickUpWorkspace()
+	const disconnectClickUp = useDisconnectClickUp()
 
 	useEffect(() => {
 		checkPushStatus()
@@ -80,6 +99,90 @@ function SettingsPage() {
 			<h1 className="text-3xl font-bold tracking-tight text-foreground">
 				Settings
 			</h1>
+
+			<Card>
+				<CardHeader>
+					<CardTitle>ClickUp Integration</CardTitle>
+				</CardHeader>
+				<CardContent>
+					{isClickUpLoading ? (
+						<p className="text-muted-foreground">Loading workspaces...</p>
+					) : clickUpError ? (
+						<div className="flex flex-col gap-4">
+							<p className="text-muted-foreground">
+								Connect your ClickUp account to sync tasks and generate plans.
+							</p>
+							<div className="flex gap-2">
+								<Button
+									onClick={() =>
+										authClient.oauth2.link({
+											providerId: 'clickup',
+											callbackURL: window.location.href,
+										})
+									}
+								>
+									Connect ClickUp
+								</Button>
+								<Button variant="outline" onClick={() => refetchClickUp()}>
+									Check Connection
+								</Button>
+							</div>
+						</div>
+					) : (
+						<div className="space-y-6">
+							<div className="space-y-4">
+								{clickUpData?.workspaces.length === 0 && (
+									<p className="text-muted-foreground">No workspaces found.</p>
+								)}
+								{clickUpData?.workspaces.map((workspace) => (
+									<div
+										key={workspace.teamId}
+										className="flex items-center justify-between"
+									>
+										<div>
+											<p className="font-medium">{workspace.name}</p>
+											<p className="text-sm text-muted-foreground">
+												{workspace.enabled ? 'Active' : 'Inactive'}
+											</p>
+										</div>
+										<Button
+											variant={workspace.enabled ? 'outline' : 'default'}
+											size="sm"
+											onClick={() => {
+												if (workspace.enabled) {
+													disableWorkspace.mutate(workspace.teamId)
+												} else {
+													enableWorkspace.mutate({
+														teamId: workspace.teamId,
+														name: workspace.name,
+													})
+												}
+											}}
+											disabled={
+												enableWorkspace.isPending || disableWorkspace.isPending
+											}
+										>
+											{workspace.enabled ? 'Disable' : 'Enable'}
+										</Button>
+									</div>
+								))}
+							</div>
+
+							<div className="pt-4 border-t">
+								<Button
+									variant="destructive"
+									onClick={() => disconnectClickUp.mutate()}
+									disabled={disconnectClickUp.isPending}
+								>
+									{disconnectClickUp.isPending
+										? 'Disconnecting...'
+										: 'Disconnect Integration'}
+								</Button>
+							</div>
+						</div>
+					)}
+				</CardContent>
+			</Card>
 
 			<Card>
 				<CardHeader>

@@ -1,5 +1,6 @@
 import { SubmitFeedbackRequestSchema } from '@taskwatch/shared/schemas'
 import { Hono } from 'hono'
+import type { AuthVariables } from '../middleware/auth'
 import { fetchTaskComments } from '../services/clickup'
 import {
 	createFeedback,
@@ -12,13 +13,26 @@ import {
 } from '../services/db'
 import type { Env } from '../types'
 
-export const plansRoutes = new Hono<{ Bindings: Env }>()
+export const plansRoutes = new Hono<{
+	Bindings: Env
+	Variables: AuthVariables
+}>()
 
 plansRoutes.get('/:planId', async (c) => {
+	const session = c.get('session')
+	if (!session) {
+		return c.json({ error: 'Unauthorized' }, 401)
+	}
+
 	const planId = c.req.param('planId')
 	const plan = await getPlanById(c.env.DB, planId)
 
 	if (!plan) {
+		return c.json({ error: 'Plan not found' }, 404)
+	}
+
+	const task = await getTaskById(c.env.DB, plan.taskId, session.userId)
+	if (!task) {
 		return c.json({ error: 'Plan not found' }, 404)
 	}
 
@@ -28,10 +42,20 @@ plansRoutes.get('/:planId', async (c) => {
 })
 
 plansRoutes.post('/:planId/feedback', async (c) => {
+	const session = c.get('session')
+	if (!session) {
+		return c.json({ error: 'Unauthorized' }, 401)
+	}
+
 	const planId = c.req.param('planId')
 	const plan = await getPlanById(c.env.DB, planId)
 
 	if (!plan) {
+		return c.json({ error: 'Plan not found' }, 404)
+	}
+
+	const task = await getTaskById(c.env.DB, plan.taskId, session.userId)
+	if (!task) {
 		return c.json({ error: 'Plan not found' }, 404)
 	}
 
@@ -52,33 +76,44 @@ plansRoutes.post('/:planId/feedback', async (c) => {
 
 	await updatePlanStatus(c.env.DB, planId, 'CHANGES_REQUESTED')
 
-	const task = await getTaskById(c.env.DB, plan.taskId)
-	if (task) {
-		await updateTaskStatus(c.env.DB, plan.taskId, 'PLAN_REVISION')
+	await updateTaskStatus(c.env.DB, plan.taskId, 'PLAN_REVISION', session.userId)
 
-		const _comments = await fetchTaskComments(c.env, task.clickupTaskId)
+	const _comments = await fetchTaskComments(
+		c.env,
+		session.userId,
+		task.clickupTaskId,
+	)
 
-		await createRun(c.env.DB, {
-			taskId: plan.taskId,
-			type: 'PLAN',
-			status: 'QUEUED',
-			startedAt: new Date().toISOString(),
-			finishedAt: null,
-			logs: null,
-			errorSummary: null,
-		})
+	await createRun(c.env.DB, {
+		taskId: plan.taskId,
+		type: 'PLAN',
+		status: 'QUEUED',
+		startedAt: new Date().toISOString(),
+		finishedAt: null,
+		logs: null,
+		errorSummary: null,
+	})
 
-		await updateTaskStatus(c.env.DB, plan.taskId, 'PLANNING')
-	}
+	await updateTaskStatus(c.env.DB, plan.taskId, 'PLANNING', session.userId)
 
 	return c.json({ success: true })
 })
 
 plansRoutes.post('/:planId/approve', async (c) => {
+	const session = c.get('session')
+	if (!session) {
+		return c.json({ error: 'Unauthorized' }, 401)
+	}
+
 	const planId = c.req.param('planId')
 	const plan = await getPlanById(c.env.DB, planId)
 
 	if (!plan) {
+		return c.json({ error: 'Plan not found' }, 404)
+	}
+
+	const task = await getTaskById(c.env.DB, plan.taskId, session.userId)
+	if (!task) {
 		return c.json({ error: 'Plan not found' }, 404)
 	}
 
@@ -88,7 +123,7 @@ plansRoutes.post('/:planId/approve', async (c) => {
 
 	const now = new Date().toISOString()
 	await updatePlanStatus(c.env.DB, planId, 'APPROVED', now)
-	await updateTaskStatus(c.env.DB, plan.taskId, 'PLAN_APPROVED')
+	await updateTaskStatus(c.env.DB, plan.taskId, 'PLAN_APPROVED', session.userId)
 
 	return c.json({ success: true })
 })

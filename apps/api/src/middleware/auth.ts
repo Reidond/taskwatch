@@ -2,7 +2,7 @@ import type { Context, Next } from 'hono'
 import { createAuth } from '../lib/auth'
 import type { Env } from '../types'
 
-interface AuthVariables {
+export interface AuthVariables {
 	user: { id: string; email: string; name: string } | null
 	session: { id: string; userId: string; expiresAt: Date } | null
 }

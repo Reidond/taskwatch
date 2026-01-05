@@ -10,10 +10,14 @@ import type {
 	Worktree,
 } from '@taskwatch/shared/types'
 
-export async function getTasks(db: D1Database): Promise<TaskWithDetails[]> {
+export async function getTasks(
+	db: D1Database,
+	userId: string,
+): Promise<TaskWithDetails[]> {
 	const tasks = await db
-		.prepare('SELECT * FROM tasks ORDER BY updated_at DESC')
-		.all<Task>()
+		.prepare('SELECT * FROM tasks WHERE user_id = ? ORDER BY updated_at DESC')
+		.bind(userId)
+		.all<DbTask>()
 
 	const result: TaskWithDetails[] = []
 	for (const task of tasks.results) {
@@ -50,11 +54,15 @@ export async function getTasks(db: D1Database): Promise<TaskWithDetails[]> {
 export async function getTaskById(
 	db: D1Database,
 	id: string,
+	userId?: string,
 ): Promise<TaskWithDetails | null> {
-	const task = await db
-		.prepare('SELECT * FROM tasks WHERE id = ?')
-		.bind(id)
-		.first<Task>()
+	const taskQuery = userId
+		? db
+				.prepare('SELECT * FROM tasks WHERE id = ? AND user_id = ?')
+				.bind(id, userId)
+		: db.prepare('SELECT * FROM tasks WHERE id = ?').bind(id)
+	const task = await taskQuery.first<DbTask>()
+
 	if (!task) return null
 
 	const plan = await db
@@ -87,11 +95,20 @@ export async function getTaskById(
 export async function getTaskByClickUpId(
 	db: D1Database,
 	clickupTaskId: string,
+	userId?: string,
 ): Promise<Task | null> {
-	const task = await db
-		.prepare('SELECT * FROM tasks WHERE clickup_task_id = ?')
-		.bind(clickupTaskId)
-		.first<Task>()
+	const taskQuery = userId
+		? db
+				.prepare(
+					'SELECT * FROM tasks WHERE clickup_task_id = ? AND user_id = ?',
+				)
+				.bind(clickupTaskId, userId)
+		: db
+				.prepare('SELECT * FROM tasks WHERE clickup_task_id = ?')
+				.bind(clickupTaskId)
+
+	const task = await taskQuery.first<DbTask>()
+
 	return task ? mapTaskFromDb(task) : null
 }
 
@@ -100,7 +117,7 @@ export async function upsertTask(
 	task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
 ): Promise<Task> {
 	const now = new Date().toISOString()
-	const existing = await getTaskByClickUpId(db, task.clickupTaskId)
+	const existing = await getTaskByClickUpId(db, task.clickupTaskId, task.userId)
 
 	if (existing) {
 		await db
@@ -108,7 +125,7 @@ export async function upsertTask(
 				`UPDATE tasks SET 
 					title = ?, description_md = ?, clickup_status = ?, 
 					assignee_id = ?, url = ?, updated_at_clickup = ?, updated_at = ?
-				WHERE id = ?`,
+				WHERE id = ? AND user_id = ?`,
 			)
 			.bind(
 				task.title,
@@ -119,6 +136,7 @@ export async function upsertTask(
 				task.updatedAtClickup,
 				now,
 				existing.id,
+				task.userId,
 			)
 			.run()
 
@@ -128,11 +146,12 @@ export async function upsertTask(
 	const id = task.id || crypto.randomUUID()
 	await db
 		.prepare(
-			`INSERT INTO tasks (id, clickup_task_id, title, description_md, clickup_status, assignee_id, url, status, updated_at_clickup, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO tasks (id, user_id, clickup_task_id, title, description_md, clickup_status, assignee_id, url, status, updated_at_clickup, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		)
 		.bind(
 			id,
+			task.userId,
 			task.clickupTaskId,
 			task.title,
 			task.descriptionMd,
@@ -158,11 +177,19 @@ export async function updateTaskStatus(
 	db: D1Database,
 	id: string,
 	status: Task['status'],
+	userId?: string,
 ): Promise<void> {
-	await db
-		.prepare('UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?')
-		.bind(status, new Date().toISOString(), id)
-		.run()
+	const now = new Date().toISOString()
+	const query = userId
+		? db
+				.prepare(
+					'UPDATE tasks SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?',
+				)
+				.bind(status, now, id, userId)
+		: db
+				.prepare('UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?')
+				.bind(status, now, id)
+	await query.run()
 }
 
 export async function getPlansByTaskId(
@@ -486,8 +513,146 @@ export async function deletePushSubscription(
 		.run()
 }
 
+export interface ClickUpAccountLink {
+	userId: string
+	accountId: string
+}
+
+export async function getClickUpAccounts(
+	db: D1Database,
+): Promise<ClickUpAccountLink[]> {
+	const result = await db
+		.prepare('SELECT user_id, account_id FROM accounts WHERE provider_id = ?')
+		.bind('clickup')
+		.all<{ user_id: string; account_id: string }>()
+	return result.results.map((row) => ({
+		userId: row.user_id,
+		accountId: row.account_id,
+	}))
+}
+
+interface DbClickUpWorkspace {
+	id: string
+	user_id: string
+	clickup_team_id: string
+	team_name: string | null
+	created_at: string
+	updated_at: string
+}
+
+export interface ClickUpEnabledWorkspace {
+	id: string
+	userId: string
+	clickupTeamId: string
+	teamName: string | null
+	createdAt: string
+	updatedAt: string
+}
+
+export async function getEnabledClickUpWorkspaces(
+	db: D1Database,
+	userId: string,
+): Promise<ClickUpEnabledWorkspace[]> {
+	const result = await db
+		.prepare('SELECT * FROM clickup_enabled_workspaces WHERE user_id = ?')
+		.bind(userId)
+		.all<DbClickUpWorkspace>()
+
+	return result.results.map(mapClickUpWorkspaceFromDb)
+}
+
+export async function upsertEnabledClickUpWorkspace(
+	db: D1Database,
+	userId: string,
+	teamId: string,
+	teamName?: string,
+): Promise<ClickUpEnabledWorkspace> {
+	const now = new Date().toISOString()
+	const existing = await db
+		.prepare(
+			'SELECT * FROM clickup_enabled_workspaces WHERE user_id = ? AND clickup_team_id = ?',
+		)
+		.bind(userId, teamId)
+		.first<DbClickUpWorkspace>()
+
+	if (existing) {
+		await db
+			.prepare(
+				'UPDATE clickup_enabled_workspaces SET team_name = ?, updated_at = ? WHERE id = ?',
+			)
+			.bind(teamName ?? existing.team_name, now, existing.id)
+			.run()
+
+		return mapClickUpWorkspaceFromDb({
+			...existing,
+			team_name: teamName ?? existing.team_name,
+			updated_at: now,
+		})
+	}
+
+	const id = crypto.randomUUID()
+	await db
+		.prepare(
+			`INSERT INTO clickup_enabled_workspaces (id, user_id, clickup_team_id, team_name, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?)`,
+		)
+		.bind(id, userId, teamId, teamName ?? null, now, now)
+		.run()
+
+	return {
+		id,
+		userId,
+		clickupTeamId: teamId,
+		teamName: teamName ?? null,
+		createdAt: now,
+		updatedAt: now,
+	}
+}
+
+export async function deleteEnabledClickUpWorkspace(
+	db: D1Database,
+	userId: string,
+	teamId: string,
+): Promise<void> {
+	await db
+		.prepare(
+			'DELETE FROM clickup_enabled_workspaces WHERE user_id = ? AND clickup_team_id = ?',
+		)
+		.bind(userId, teamId)
+		.run()
+}
+
+export async function deleteClickUpAccount(
+	db: D1Database,
+	userId: string,
+): Promise<void> {
+	await db
+		.prepare('DELETE FROM accounts WHERE user_id = ? AND provider_id = ?')
+		.bind(userId, 'clickup')
+		.run()
+
+	await db
+		.prepare('DELETE FROM clickup_enabled_workspaces WHERE user_id = ?')
+		.bind(userId)
+		.run()
+}
+
+function mapClickUpWorkspaceFromDb(
+	row: DbClickUpWorkspace,
+): ClickUpEnabledWorkspace {
+	return {
+		id: row.id,
+		userId: row.user_id,
+		clickupTeamId: row.clickup_team_id,
+		teamName: row.team_name,
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
+	}
+}
+
 interface DbTask {
 	id: string
+	user_id: string
 	clickup_task_id: string
 	title: string
 	description_md: string | null
@@ -504,6 +669,7 @@ function mapTaskFromDb(row: DbTask | Task): Task {
 	if ('clickupTaskId' in row) return row
 	return {
 		id: row.id,
+		userId: row.user_id,
 		clickupTaskId: row.clickup_task_id,
 		title: row.title,
 		descriptionMd: row.description_md,

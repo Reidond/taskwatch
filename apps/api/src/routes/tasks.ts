@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { fetchTaskComments } from '../services/clickup'
+import type { AuthVariables } from '../middleware/auth'
 import {
 	createRun,
 	getFeedbackByPlanId,
@@ -12,16 +12,29 @@ import {
 } from '../services/db'
 import type { Env } from '../types'
 
-export const tasksRoutes = new Hono<{ Bindings: Env }>()
+export const tasksRoutes = new Hono<{
+	Bindings: Env
+	Variables: AuthVariables
+}>()
 
 tasksRoutes.get('/', async (c) => {
-	const tasks = await getTasks(c.env.DB)
+	const session = c.get('session')
+	if (!session) {
+		return c.json({ error: 'Unauthorized' }, 401)
+	}
+
+	const tasks = await getTasks(c.env.DB, session.userId)
 	return c.json({ tasks })
 })
 
 tasksRoutes.get('/:taskId', async (c) => {
+	const session = c.get('session')
+	if (!session) {
+		return c.json({ error: 'Unauthorized' }, 401)
+	}
+
 	const taskId = c.req.param('taskId')
-	const task = await getTaskById(c.env.DB, taskId)
+	const task = await getTaskById(c.env.DB, taskId, session.userId)
 
 	if (!task) {
 		return c.json({ error: 'Task not found' }, 404)
@@ -31,26 +44,61 @@ tasksRoutes.get('/:taskId', async (c) => {
 })
 
 tasksRoutes.get('/:taskId/plans', async (c) => {
+	const session = c.get('session')
+	if (!session) {
+		return c.json({ error: 'Unauthorized' }, 401)
+	}
+
 	const taskId = c.req.param('taskId')
+	const task = await getTaskById(c.env.DB, taskId, session.userId)
+	if (!task) {
+		return c.json({ error: 'Task not found' }, 404)
+	}
+
 	const plans = await getPlansByTaskId(c.env.DB, taskId)
 	return c.json({ plans })
 })
 
 tasksRoutes.get('/:taskId/runs', async (c) => {
+	const session = c.get('session')
+	if (!session) {
+		return c.json({ error: 'Unauthorized' }, 401)
+	}
+
 	const taskId = c.req.param('taskId')
+	const task = await getTaskById(c.env.DB, taskId, session.userId)
+	if (!task) {
+		return c.json({ error: 'Task not found' }, 404)
+	}
+
 	const runs = await getRunsByTaskId(c.env.DB, taskId)
 	return c.json({ runs })
 })
 
 tasksRoutes.get('/:taskId/merge-requests', async (c) => {
+	const session = c.get('session')
+	if (!session) {
+		return c.json({ error: 'Unauthorized' }, 401)
+	}
+
 	const taskId = c.req.param('taskId')
+	const task = await getTaskById(c.env.DB, taskId, session.userId)
+	if (!task) {
+		return c.json({ error: 'Task not found' }, 404)
+	}
+
 	const mergeRequests = await getMergeRequestsByTaskId(c.env.DB, taskId)
 	return c.json({ mergeRequests })
 })
 
 tasksRoutes.post('/:taskId/plan/generate', async (c) => {
+	const session = c.get('session')
+	if (!session) {
+		return c.json({ error: 'Unauthorized' }, 401)
+	}
+
 	const taskId = c.req.param('taskId')
-	const task = await getTaskById(c.env.DB, taskId)
+	const task = await getTaskById(c.env.DB, taskId, session.userId)
 
 	if (!task) {
 		return c.json({ error: 'Task not found' }, 404)
@@ -76,8 +124,6 @@ tasksRoutes.post('/:taskId/plan/generate', async (c) => {
 		}
 	}
 
-	const _comments = await fetchTaskComments(c.env, task.clickupTaskId)
-
 	const run = await createRun(c.env.DB, {
 		taskId,
 		type: 'PLAN',
@@ -88,14 +134,19 @@ tasksRoutes.post('/:taskId/plan/generate', async (c) => {
 		errorSummary: null,
 	})
 
-	await updateTaskStatus(c.env.DB, taskId, 'PLANNING')
+	await updateTaskStatus(c.env.DB, taskId, 'PLANNING', session.userId)
 
 	return c.json({ runId: run.id })
 })
 
 tasksRoutes.post('/:taskId/implement', async (c) => {
+	const session = c.get('session')
+	if (!session) {
+		return c.json({ error: 'Unauthorized' }, 401)
+	}
+
 	const taskId = c.req.param('taskId')
-	const task = await getTaskById(c.env.DB, taskId)
+	const task = await getTaskById(c.env.DB, taskId, session.userId)
 
 	if (!task) {
 		return c.json({ error: 'Task not found' }, 404)
@@ -122,7 +173,7 @@ tasksRoutes.post('/:taskId/implement', async (c) => {
 		errorSummary: null,
 	})
 
-	await updateTaskStatus(c.env.DB, taskId, 'IMPLEMENTING')
+	await updateTaskStatus(c.env.DB, taskId, 'IMPLEMENTING', session.userId)
 
 	return c.json({ runId: run.id })
 })

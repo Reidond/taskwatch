@@ -6,7 +6,11 @@ import {
 import {
 	approvePlan,
 	deleteWorktree,
+	disableClickUpWorkspace,
+	disconnectClickUp,
+	enableClickUpWorkspace,
 	generatePlan,
+	getClickUpWorkspaces,
 	getDaemonStatus,
 	getPlan,
 	getTask,
@@ -22,6 +26,11 @@ import {
 export const tasksQueryOptions = queryOptions({
 	queryKey: ['tasks'],
 	queryFn: getTasks,
+})
+
+export const clickUpWorkspacesQueryOptions = queryOptions({
+	queryKey: ['clickup', 'workspaces'],
+	queryFn: getClickUpWorkspaces,
 })
 
 export const taskQueryOptions = (taskId: string) =>
@@ -58,6 +67,40 @@ export const worktreesQueryOptions = queryOptions({
 	queryKey: ['worktrees'],
 	queryFn: getWorktrees,
 })
+
+export function useEnableClickUpWorkspace() {
+	const queryClient = useQueryClient()
+
+	return useMutation({
+		mutationFn: ({ teamId, name }: { teamId: string; name?: string }) =>
+			enableClickUpWorkspace(teamId, name),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['clickup', 'workspaces'] })
+		},
+	})
+}
+
+export function useDisableClickUpWorkspace() {
+	const queryClient = useQueryClient()
+
+	return useMutation({
+		mutationFn: disableClickUpWorkspace,
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['clickup', 'workspaces'] })
+		},
+	})
+}
+
+export function useDisconnectClickUp() {
+	const queryClient = useQueryClient()
+
+	return useMutation({
+		mutationFn: disconnectClickUp,
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['clickup', 'workspaces'] })
+		},
+	})
+}
 
 export function useGeneratePlan() {
 	const queryClient = useQueryClient()

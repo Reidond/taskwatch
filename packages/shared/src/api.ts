@@ -1,4 +1,5 @@
 import type {
+	ClickUpWorkspace,
 	FileChanges,
 	MergeRequest,
 	Plan,
@@ -46,6 +47,10 @@ export interface MergeRequestListResponse {
 
 export interface WorktreeListResponse {
 	worktrees: Worktree[]
+}
+
+export interface ClickUpWorkspaceListResponse {
+	workspaces: ClickUpWorkspace[]
 }
 
 export interface GeneratePlanResponse {

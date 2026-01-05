@@ -1,9 +1,11 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
+import type { AuthVariables } from './middleware/auth'
 import { sessionAuth } from './middleware/auth'
 import { authRoutes } from './routes/auth'
 import { internalRoutes } from './routes/internal'
+import { clickupRoutes } from './routes/clickup'
 import { plansRoutes } from './routes/plans'
 import { pushRoutes } from './routes/push'
 import { runsRoutes } from './routes/runs'
@@ -13,11 +15,6 @@ import { worktreesRoutes } from './routes/worktrees'
 import { syncClickUpTasks } from './services/clickup'
 import { getDaemonStatus } from './services/db'
 import type { Env } from './types'
-
-interface AuthVariables {
-	user: { id: string; email: string; name: string } | null
-	session: { id: string; userId: string; expiresAt: Date } | null
-}
 
 const app = new Hono<{ Bindings: Env; Variables: AuthVariables }>()
 
@@ -41,12 +38,14 @@ app.use('/api/plans/*', sessionAuth)
 app.use('/api/runs/*', sessionAuth)
 app.use('/api/worktrees/*', sessionAuth)
 app.use('/api/push/*', sessionAuth)
+app.use('/api/clickup/*', sessionAuth)
 
 app.route('/api/tasks', tasksRoutes)
 app.route('/api/plans', plansRoutes)
 app.route('/api/runs', runsRoutes)
 app.route('/api/worktrees', worktreesRoutes)
 app.route('/api/push', pushRoutes)
+app.route('/api/clickup', clickupRoutes)
 app.route('/internal', internalRoutes)
 app.route('/webhooks', webhooksRoutes)
 

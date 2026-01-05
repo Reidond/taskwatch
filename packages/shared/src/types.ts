@@ -29,6 +29,7 @@ export type MergeRequestStatus = 'OPEN' | 'MERGED' | 'CLOSED'
 // Database Models
 export interface Task {
 	id: string
+	userId: string
 	clickupTaskId: string
 	title: string
 	descriptionMd: string | null
@@ -135,6 +136,12 @@ export interface ClickUpTask {
 	}>
 	url: string
 	date_updated: string
+}
+
+export interface ClickUpWorkspace {
+	teamId: string
+	name: string
+	enabled: boolean
 }
 
 // Daemon Job Types

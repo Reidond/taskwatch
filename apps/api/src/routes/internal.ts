@@ -75,7 +75,11 @@ internalRoutes.get('/jobs/poll', async (c) => {
 			}
 		}
 
-		const comments = await fetchTaskComments(c.env, task.clickupTaskId)
+		const comments = await fetchTaskComments(
+			c.env,
+			task.userId,
+			task.clickupTaskId,
+		)
 
 		return c.json({
 			job: {
@@ -187,6 +191,9 @@ internalRoutes.post('/jobs/:jobId/complete', async (c) => {
 		return c.json({ error: 'Job not found' }, 404)
 	}
 
+	const task = await getTaskById(c.env.DB, run.taskId)
+	const taskOwnerId = task?.userId
+
 	await updateRun(c.env.DB, jobId, {
 		status: 'SUCCEEDED',
 		finishedAt: new Date().toISOString(),
@@ -208,7 +215,7 @@ internalRoutes.post('/jobs/:jobId/complete', async (c) => {
 				approvedAt: null,
 			})
 
-			await updateTaskStatus(c.env.DB, run.taskId, 'PLAN_READY')
+			await updateTaskStatus(c.env.DB, run.taskId, 'PLAN_READY', taskOwnerId)
 		}
 	}
 
@@ -226,7 +233,7 @@ internalRoutes.post('/jobs/:jobId/complete', async (c) => {
 				})
 			}
 
-			await updateTaskStatus(c.env.DB, run.taskId, 'PR_READY')
+			await updateTaskStatus(c.env.DB, run.taskId, 'PR_READY', taskOwnerId)
 		}
 	}
 
@@ -247,6 +254,9 @@ internalRoutes.post('/jobs/:jobId/fail', async (c) => {
 		return c.json({ error: 'Job not found' }, 404)
 	}
 
+	const task = await getTaskById(c.env.DB, run.taskId)
+	const taskOwnerId = task?.userId
+
 	await updateRun(c.env.DB, jobId, {
 		status: 'FAILED',
 		finishedAt: new Date().toISOString(),
@@ -254,7 +264,7 @@ internalRoutes.post('/jobs/:jobId/fail', async (c) => {
 		logs: parsed.data.logs ?? run.logs,
 	})
 
-	await updateTaskStatus(c.env.DB, run.taskId, 'BLOCKED')
+	await updateTaskStatus(c.env.DB, run.taskId, 'BLOCKED', taskOwnerId)
 
 	return c.json({ success: true })
 })
