@@ -13,7 +13,10 @@
 	},
 	"dependencies": {
 		"@taskwatch/shared": "workspace:*",
+		"better-auth": "^1.4.10",
 		"hono": "^4.6.14",
+		"kysely": "^0.28.9",
+		"kysely-d1": "^0.4.0",
 		"nanoid": "^5.0.9"
 	},
 	"devDependencies": {
