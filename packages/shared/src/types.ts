@@ -186,3 +186,15 @@ export interface DaemonConfig {
 		port: number
 	}
 }
+
+// Daemon Status
+export type DaemonStatusType = 'online' | 'offline'
+
+export interface DaemonStatus {
+	id: string
+	daemonId: string
+	lastHeartbeat: string
+	status: DaemonStatusType
+	createdAt: string
+	updatedAt: string
+}

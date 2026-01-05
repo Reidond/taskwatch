@@ -88,6 +88,13 @@ export class OrchestratorClient {
 			method: 'DELETE',
 		})
 	}
+
+	async sendHeartbeat(daemonId: string): Promise<void> {
+		await this.fetch('/internal/heartbeat', {
+			method: 'POST',
+			body: JSON.stringify({ daemonId }),
+		})
+	}
 }
 
 export function isPlanJob(

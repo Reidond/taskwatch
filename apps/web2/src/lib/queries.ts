@@ -7,6 +7,7 @@ import {
 	approvePlan,
 	deleteWorktree,
 	generatePlan,
+	getDaemonStatus,
 	getPlan,
 	getTask,
 	getTaskMergeRequests,
@@ -119,3 +120,9 @@ export function useDeleteWorktree() {
 		},
 	})
 }
+
+export const daemonStatusQueryOptions = queryOptions({
+	queryKey: ['daemon', 'status'],
+	queryFn: getDaemonStatus,
+	refetchInterval: 10000,
+})

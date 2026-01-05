@@ -1,4 +1,5 @@
 import {
+	HeartbeatRequestSchema,
 	ImplementResultSchema,
 	JobClaimRequestSchema,
 	JobCompleteRequestSchema,
@@ -23,12 +24,25 @@ import {
 	getTaskById,
 	updateRun,
 	updateTaskStatus,
+	upsertDaemonStatus,
 } from '../services/db'
 import type { Env } from '../types'
 
 export const internalRoutes = new Hono<{ Bindings: Env }>()
 
 internalRoutes.use('/*', daemonAuth)
+
+internalRoutes.post('/heartbeat', async (c) => {
+	const body = await c.req.json()
+	const parsed = HeartbeatRequestSchema.safeParse(body)
+
+	if (!parsed.success) {
+		return c.json({ error: 'Invalid request body' }, 400)
+	}
+
+	const status = await upsertDaemonStatus(c.env.DB, parsed.data.daemonId)
+	return c.json({ status })
+})
 
 internalRoutes.get('/jobs/poll', async (c) => {
 	const run = await getQueuedRun(c.env.DB)

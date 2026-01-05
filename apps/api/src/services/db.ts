@@ -1,4 +1,5 @@
 import type {
+	DaemonStatus,
 	MergeRequest,
 	Plan,
 	PlanFeedback,
@@ -653,5 +654,75 @@ function mapPushSubscriptionFromDb(
 		endpoint: row.endpoint,
 		keys: row.keys,
 		createdAt: row.created_at,
+	}
+}
+
+export async function getDaemonStatus(
+	db: D1Database,
+): Promise<DaemonStatus | null> {
+	const row = await db
+		.prepare('SELECT * FROM daemon_status WHERE id = ?')
+		.bind('singleton')
+		.first<DbDaemonStatus>()
+	return row ? mapDaemonStatusFromDb(row) : null
+}
+
+export async function upsertDaemonStatus(
+	db: D1Database,
+	daemonId: string,
+): Promise<DaemonStatus> {
+	const now = new Date().toISOString()
+	const existing = await getDaemonStatus(db)
+
+	if (existing) {
+		await db
+			.prepare(
+				'UPDATE daemon_status SET daemon_id = ?, last_heartbeat = ?, status = ?, updated_at = ? WHERE id = ?',
+			)
+			.bind(daemonId, now, 'online', now, 'singleton')
+			.run()
+		return {
+			...existing,
+			daemonId,
+			lastHeartbeat: now,
+			status: 'online',
+			updatedAt: now,
+		}
+	}
+
+	await db
+		.prepare(
+			'INSERT INTO daemon_status (id, daemon_id, last_heartbeat, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+		)
+		.bind('singleton', daemonId, now, 'online', now, now)
+		.run()
+
+	return {
+		id: 'singleton',
+		daemonId,
+		lastHeartbeat: now,
+		status: 'online',
+		createdAt: now,
+		updatedAt: now,
+	}
+}
+
+interface DbDaemonStatus {
+	id: string
+	daemon_id: string
+	last_heartbeat: string
+	status: 'online' | 'offline'
+	created_at: string
+	updated_at: string
+}
+
+function mapDaemonStatusFromDb(row: DbDaemonStatus): DaemonStatus {
+	return {
+		id: row.id,
+		daemonId: row.daemon_id,
+		lastHeartbeat: row.last_heartbeat,
+		status: row.status,
+		createdAt: row.created_at,
+		updatedAt: row.updated_at,
 	}
 }

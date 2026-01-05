@@ -31,12 +31,21 @@ export class Daemon {
 
 		while (this.running) {
 			try {
+				await this.sendHeartbeat()
 				await this.pollAndProcess()
 			} catch (error) {
 				console.error('[Daemon] Error during poll:', error)
 			}
 
 			await this.sleep(this.config.pollIntervalSeconds * 1000)
+		}
+	}
+
+	private async sendHeartbeat(): Promise<void> {
+		try {
+			await this.orchestrator.sendHeartbeat(this.daemonId)
+		} catch (error) {
+			console.error('[Daemon] Failed to send heartbeat:', error)
 		}
 	}
 

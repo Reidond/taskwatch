@@ -113,3 +113,19 @@ export async function unsubscribePush(endpoint: string): Promise<void> {
 		body: JSON.stringify({ endpoint }),
 	})
 }
+
+export interface DaemonStatusResponse {
+	status: {
+		id: string
+		daemonId: string
+		lastHeartbeat: string
+		status: string
+		createdAt: string
+		updatedAt: string
+	} | null
+	online: boolean
+}
+
+export async function getDaemonStatus(): Promise<DaemonStatusResponse> {
+	return fetchApi('/daemon/status')
+}

@@ -94,3 +94,7 @@ export const ImplementResultSchema = z.object({
 		}),
 	),
 })
+
+export const HeartbeatRequestSchema = z.object({
+	daemonId: z.string(),
+})
