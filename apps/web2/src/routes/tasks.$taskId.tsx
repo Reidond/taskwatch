@@ -238,7 +238,7 @@ function PlanSection({ plan, taskStatus }: { plan: Plan; taskStatus: string }) {
 							value={feedbackText}
 							onChange={(e) => setFeedbackText(e.target.value)}
 							placeholder="Enter your feedback for plan revision..."
-							className="min-h-[100px]"
+							className="min-h-25"
 						/>
 						<Button
 							onClick={handleSubmitFeedback}
