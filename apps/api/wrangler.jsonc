@@ -7,7 +7,7 @@
 		{
 			"binding": "DB",
 			"database_name": "taskwatch-db",
-			"database_id": "placeholder-replace-after-creation"
+			"database_id": "4c03274a-0856-491b-92de-f55748e7725b"
 		}
 	],
 	"triggers": {
@@ -15,5 +15,11 @@
 	},
 	"vars": {
 		"ENVIRONMENT": "production"
-	}
+	},
+	"routes": [
+		{
+			"pattern": "taskwatch.andriishafar.xyz/api/*",
+			"zone_name": "andriishafar.xyz"
+		}
+	]
 }

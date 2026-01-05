@@ -1,14 +1,33 @@
+import { mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import type { DaemonConfig } from '@taskwatch/shared/types'
 
 const CONFIG_PATH = join(homedir(), '.config', 'taskwatch', 'config.json')
 
+const DEFAULT_CONFIG = {
+	worktreeRoot: '~/agent-worktrees',
+	sourceRepos: {},
+	baseBranch: 'develop',
+	orchestratorUrl: 'http://localhost:8787',
+	orchestratorToken: 'env:DAEMON_AUTH_TOKEN',
+	gitlabToken: 'env:GITLAB_TOKEN',
+	pollIntervalSeconds: 10,
+	opencode: {
+		hostname: '127.0.0.1',
+		port: 4096,
+	},
+}
+
 export async function loadConfig(): Promise<DaemonConfig> {
 	const file = Bun.file(CONFIG_PATH)
+	const exists = await file.exists()
 
-	if (!(await file.exists())) {
-		throw new Error(`Config file not found at ${CONFIG_PATH}`)
+	if (!exists) {
+		await createDefaultConfig()
+		console.log(`[Config] Created default config at ${CONFIG_PATH}`)
+		console.log('[Config] Please edit the config file and restart the daemon.')
+		process.exit(0)
 	}
 
 	const raw = await file.json()
@@ -49,4 +68,9 @@ function resolveEnvValue(value: string): string {
 		return envValue
 	}
 	return value
+}
+
+async function createDefaultConfig(): Promise<void> {
+	await mkdir(dirname(CONFIG_PATH), { recursive: true })
+	await Bun.write(CONFIG_PATH, JSON.stringify(DEFAULT_CONFIG, null, '\t'))
 }
