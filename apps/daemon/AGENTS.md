@@ -27,20 +27,29 @@ src/
 | Git operations | `git.ts` | Worktree create/cleanup |
 | API calls | `api.ts` | OrchestratorClient methods |
 
-## CONVENTIONS
-
-- Config path: `~/.config/taskwatch/config.json`
-- Worktrees created at: `<worktreeRoot>/<taskId>/<repoName>/`
-- Branch naming: `taskwatch/<taskId>-<slug>`
-- All MRs created as draft, targeting `develop`
-- Logs prefixed with `[Daemon]`, `[CLI]`
-
 ## JOB TYPES
 
 | Type | Input | Output |
 |------|-------|--------|
 | `plan` | task title/description | assumptions, approach, fileChanges |
 | `implement` | approved plan + repos | commits, MR URLs |
+
+## CONVENTIONS
+
+- Config path: `~/.config/taskwatch/config.json`
+- Secrets via `env:VARIABLE` syntax in config
+- Worktrees: `<worktreeRoot>/<taskId>/<repoName>/`
+- Branch naming: `taskwatch/<taskId>-<slug>`
+- All MRs created as draft, targeting `develop`
+- Logs prefixed with `[Daemon]`, `[CLI]`
+
+## UNIQUE PATTERNS
+
+- Polling-driven: 10s interval, optimistic job claiming
+- Session-based AI: dedicated opencode session per job
+- Fetch-first: always fetch before creating worktrees
+- Smart commits: only commits if changes exist, returns HEAD otherwise
+- JSON extraction: parses AI responses from markdown code blocks
 
 ## ANTI-PATTERNS
 

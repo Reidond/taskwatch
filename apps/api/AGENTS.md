@@ -37,14 +37,16 @@ src/
 
 ## CONVENTIONS
 
-- Route files export `Hono` router instance
+- Route files export `Hono<{ Bindings: Env }>` router instance
 - Mount at `/api/*` (public), `/internal/*` (daemon), `/webhooks/*`
-- CORS enabled only for `/api/*` paths
+- CORS enabled only for `/api/*` paths (localhost:5173, taskwatch.pages.dev)
 - Response shape: `{ data: T }` or `{ error: string }`
 - Use `nanoid()` for ID generation
+- Zod schemas from `@taskwatch/shared/schemas` for validation
 
 ## ANTI-PATTERNS
 
 - Never expose internal endpoints without daemonAuth
 - Never accept webhooks without signature verification
 - Never use raw SQL strings (use db.ts helpers)
+- Never hardcode CORS origins (use env or config)

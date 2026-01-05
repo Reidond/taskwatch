@@ -1,7 +1,7 @@
 # TASKWATCH KNOWLEDGE BASE
 
-**Generated:** 2026-01-04T19:52:00Z
-**Commit:** 3ffe45d
+**Generated:** 2026-01-05T00:10:00Z
+**Commit:** 3ddee50
 **Branch:** main
 
 ## OVERVIEW
@@ -36,14 +36,6 @@ taskwatch/
 | GitLab integration | `apps/daemon/src/gitlab.ts` | Uses @gitbeaker/rest |
 | Git worktrees | `apps/daemon/src/git.ts` | Worktree management |
 
-## CONVENTIONS
-
-- **Formatting**: Biome (tabs, single quotes, no semicolons)
-- **EditorConfig**: 4-space indent, LF, UTF-8, trim whitespace
-- **Package refs**: `workspace:*` for internal deps
-- **Scripts**: Root orchestrates parallel dev/build via Bun
-- **Type checking**: `bun run typecheck` (shared first, then apps)
-
 ## STATE MACHINE
 
 ```
@@ -54,6 +46,15 @@ PR_READY → DONE (when all MRs merged)
 Any state → BLOCKED
 ```
 
+## CONVENTIONS
+
+- **Formatting**: Biome (tabs, single quotes, no semicolons)
+- **Package refs**: `workspace:*` for internal deps
+- **Scripts**: Root orchestrates parallel dev/build via Bun
+- **Type checking**: `bun run typecheck` (shared first, then apps)
+- **ID generation**: `nanoid()` for all IDs
+- **Response shape**: `{ data: T }` or `{ error: string }`
+
 ## ANTI-PATTERNS
 
 - Never push directly to develop/master (daemon creates MRs only)
@@ -61,14 +62,15 @@ Any state → BLOCKED
 - Never write back to ClickUp (read-only access)
 - Never use `as any` or `@ts-ignore`
 - Never commit env files or secrets
+- Never use raw SQL strings (use db.ts helpers)
 
 ## UNIQUE STYLES
 
-- D1 column names: snake_case in SQL, camelCase in TS types
-- API responses: `{ data: T }` or `{ error: string }`
+- D1 columns: snake_case in SQL, camelCase in TS types
 - Internal endpoints: `/internal/*` with daemon auth token
 - Webhooks: `/webhooks/*` with signature verification
 - Branch naming: `taskwatch/<taskId>-<slug>`
+- Worktrees: `<worktreeRoot>/<taskId>/<repoName>/`
 
 ## COMMANDS
 
@@ -77,9 +79,11 @@ Any state → BLOCKED
 bun run dev              # API + Web parallel
 bun run dev:daemon       # Daemon only
 
-# Build
+# Build & Check
 bun run build            # All apps
 bun run typecheck        # Shared → API → Web → Daemon
+bun run lint             # Biome check
+bun run lint:fix         # Biome fix
 
 # Database
 bun run db:migrate       # Remote D1
@@ -88,11 +92,6 @@ bun run db:migrate:local # Local D1
 # Deploy
 bun run deploy:api       # Wrangler deploy
 bun run deploy:web       # CF Pages deploy
-
-# Lint
-bun run lint             # Biome check
-bun run lint:fix         # Biome fix
-bun run format           # Biome format
 ```
 
 ## NOTES
