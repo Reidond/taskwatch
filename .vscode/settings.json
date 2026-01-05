@@ -5,6 +5,9 @@
 		"quickfix.biome": "explicit",
 		"source.organizeImports.biome": "explicit"
 	},
+	"eslint.enable": false,
+	"prettier.enable": false,
+	"oxc.enable": false,
 	"[javascript]": {
 		"editor.defaultFormatter": "biomejs.biome"
 	},
