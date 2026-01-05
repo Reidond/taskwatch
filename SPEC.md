@@ -4,9 +4,9 @@
 
 **TaskWatch** is an internal agentic AI system that:
 
-1. **Reads** (read-only) ClickUp tasks assigned to Andriy with status "todo" or "in progress"
+1. **Reads** (read-only) ClickUp tasks for each authorized dashboard user, scoped to the ClickUp Workspace(s) they connected via OAuth, with status "todo" or "in progress"
 2. For each eligible task, **analyzes the codebase** and **generates a technical plan**
-3. Presents the plan in a **dashboard for review** — Andriy can request changes or approve
+3. Presents the plan in a **dashboard for review** — the signed-in user can request changes or approve
 4. After approval, the agent **implements changes** using opencode and **creates merge requests** on GitLab
 
 The system is designed for the Charidy codebase, which consists of **9 separate repositories** (not a monorepo).
@@ -25,7 +25,7 @@ The system is designed for the Charidy codebase, which consists of **9 separate 
 ## 2. Goals
 
 ### 2.1 Product Goals
-- Reduce time Andriy spends translating ClickUp tasks into technical plans
+- Reduce time engineers spend translating ClickUp tasks into technical plans
 - Ensure every task results in:
   - A reviewable **implementation plan** with explicit assumptions
   - An auditable Git workflow (branch + MR) before any code is merged
@@ -43,7 +43,8 @@ The system is designed for the Charidy codebase, which consists of **9 separate 
 
 - Replacing ClickUp as the source of truth
 - Fully autonomous merging/deploying without human approval
-- Managing tasks for multiple users (MVP is single-user)
+- Building a public multi-tenant SaaS (TaskWatch remains internal)
+- Supporting multiple dashboard users is in scope, but only for authorized users (email whitelist)
 - Writing back to ClickUp (comments/status changes) — keeps ClickUp access read-only
 - Working on large/complex tasks (those are still done manually)
 
@@ -51,7 +52,7 @@ The system is designed for the Charidy codebase, which consists of **9 separate 
 
 ## 4. Stakeholders
 
-- **Andriy** — Primary user, reviewer, approver
+- **Authorized user** — Dashboard user, reviewer, approver (MVP: email-whitelisted)
 - Engineering team — Consumers of plans and MRs
 - Ops/Platform — Cloudflare, secrets, deployments
 
@@ -95,11 +96,12 @@ A single ClickUp task may require changes across multiple repositories (e.g., fr
 ### 7.1 Task Eligibility
 
 A ClickUp task is eligible when:
-- Assigned to Andriy (by assignee ID)
+- Belongs to one of the user's enabled ClickUp Workspaces
+- Assigned to the connected ClickUp user (by assignee ID)
 - Status is **"todo"** OR **"in progress"**
 - Not already finalized in TaskWatch ("DONE" state)
 
-Tasks are often vague (just a title, or poorly written description). The agent proceeds anyway, making assumptions explicit in the plan. Andriy corrects via feedback.
+Tasks are often vague (just a title, or poorly written description). The agent proceeds anyway, making assumptions explicit in the plan. The reviewer corrects via feedback.
 
 ### 7.2 State Machine
 
@@ -115,8 +117,8 @@ Any state → BLOCKED (if agent needs help)
 ### 7.3 Plan Review Flow (Dashboard-Based)
 
 1. Agent generates plan → stored in D1, visible in dashboard
-2. Andriy reviews plan in dashboard
-3. Andriy can:
+2. User reviews plan in dashboard
+3. User can:
    - **Add feedback** → agent immediately revises plan (conversation trail preserved)
    - **Approve** → triggers implementation
 4. No "Plan PR" — plans exist only in the dashboard
@@ -322,8 +324,9 @@ When a task affects multiple repos:
 
 **Dashboard Access:**
 - Tailscale network restriction (network = first auth layer)
-- GitLab OAuth via `better-auth`
-- Email whitelist (Andriy's email for MVP)
+- GitLab OAuth via `better-auth` (primary login)
+- Email whitelist (authorized emails)
+- ClickUp OAuth connection (linked to user) for task syncing
 
 **Internal Endpoints:**
 - `/webhooks/gitlab` — GitLab signature verification
@@ -335,7 +338,8 @@ When a task affects multiple repos:
 | Column | Type | Description |
 |--------|------|-------------|
 | `id` | TEXT PK | Internal ID |
-| `clickup_task_id` | TEXT UNIQUE | ClickUp task ID |
+| `user_id` | TEXT | Dashboard user ID (Better Auth user) |
+| `clickup_task_id` | TEXT | ClickUp task ID |
 | `title` | TEXT | Task title |
 | `description_md` | TEXT | Task description (markdown) |
 | `clickup_status` | TEXT | Status in ClickUp |
@@ -345,6 +349,8 @@ When a task affects multiple repos:
 | `updated_at_clickup` | DATETIME | Last update in ClickUp |
 | `created_at` | DATETIME | |
 | `updated_at` | DATETIME | |
+
+Uniqueness: `(user_id, clickup_task_id)`
 
 #### `plans`
 | Column | Type | Description |
@@ -458,9 +464,11 @@ POST /webhooks/gitlab                    # MR events
 ### 11.5 ClickUp Polling Strategy
 
 - Cron trigger: every 5 minutes
-- Fetch tasks: assigned to Andriy + status in (todo, in progress)
+- For each authorized dashboard user:
+  - Retrieve their ClickUp OAuth access token from D1 (`accounts` table via better-auth)
+  - For each enabled ClickUp Workspace: fetch tasks assigned to that ClickUp user, status in (todo, in progress)
 - Read task comments for additional context
-- Upsert into `tasks` table
+- Upsert into `tasks` table scoped by `user_id`
 - For new/updated tasks: check if re-planning needed
 
 **Idempotency:**
@@ -813,18 +821,20 @@ Low risk environment:
 | Dashboard | Tailscale + GitLab OAuth + email whitelist |
 | Worker internal APIs | Bearer token |
 | GitLab webhooks | Signature verification |
-| ClickUp | Read-only API token |
+| ClickUp | OAuth (user-linked), read-only by convention |
 | GitLab | Project access tokens (scoped) |
 
 ### 15.3 Secrets Management
 
 | Secret | Location |
 |--------|----------|
-| ClickUp API token | Cloudflare secrets |
+| ClickUp OAuth client secret | Cloudflare secrets |
+| ClickUp OAuth user tokens | D1 (`accounts` table via better-auth) |
 | GitLab tokens | Daemon local config (env vars) |
 | VAPID keys (push) | Cloudflare secrets |
 | Daemon auth token | Cloudflare secrets + daemon config |
-| OAuth client secret | Cloudflare secrets |
+| GitLab OAuth client secret | Cloudflare secrets |
+| Better Auth secret | Cloudflare secrets |
 
 ---
 
@@ -918,10 +928,11 @@ Low risk environment:
 
 ## 19. Acceptance Criteria
 
-- [ ] System detects eligible ClickUp tasks (assigned to Andriy, status todo/in-progress)
+- [ ] System detects eligible ClickUp tasks per connected user (assigned to that ClickUp user, status todo/in-progress)
 - [ ] For eligible task: plan generated with assumptions, approach, file list
-- [ ] Andriy can review plan in dashboard, add feedback, approve
+- [ ] User can review plan in dashboard, add feedback, approve
 - [ ] Feedback triggers immediate plan revision with conversation trail
+- [ ] User can connect ClickUp via OAuth and select Workspaces to sync
 - [ ] After approval: implementation runs via opencode
 - [ ] Separate MR created per affected repository, targeting `develop`
 - [ ] Task shows all MR statuses; DONE only when all merged
@@ -936,9 +947,10 @@ Low risk environment:
 | Risk | Mitigation |
 |------|------------|
 | **LLM produces incorrect plan** | Human approval gate; explicit assumptions catch misunderstandings |
-| **Large task scope** | Agent flags complexity in plan; Andriy can reject and handle manually |
+| **Large task scope** | Agent flags complexity in plan; reviewer can reject and handle manually |
 | **Opencode fails mid-implementation** | Create draft MR with partial work; preserve worktree for manual fix |
 | **ClickUp API rate limits** | 5-minute poll interval; delta sync; backoff on 429 |
+| **Wrong workspace synced** | Sync only explicitly enabled Workspaces; show connected Workspaces in Settings |
 | **Daemon machine offline** | Jobs queue; dashboard shows "agent offline"; no data loss |
 | **Cross-repo dependencies** | Unified plan ensures coherent approach; one opencode session sees all changes |
 | **Secrets in code** | Low risk (dev credentials only); future: add pre-commit scanning |
@@ -950,17 +962,26 @@ Low risk environment:
 ### Environment Variables (Worker)
 
 ```bash
-CLICKUP_API_TOKEN=          # Read-only ClickUp token
-CLICKUP_TEAM_ID=            # ClickUp team/workspace ID
-CLICKUP_ANDRIY_USER_ID=     # Andriy's ClickUp user ID
+# Better Auth
+BETTER_AUTH_SECRET=         # Used for signing/encryption (required in production)
+GITLAB_OAUTH_CLIENT_ID=     # GitLab OAuth (login)
+GITLAB_OAUTH_CLIENT_SECRET= # GitLab OAuth (login)
+
+# ClickUp OAuth (connected per dashboard user)
+CLICKUP_OAUTH_CLIENT_ID=     # ClickUp OAuth app client_id
+CLICKUP_OAUTH_CLIENT_SECRET= # ClickUp OAuth app secret
+
+# Infra / internal
 GITLAB_WEBHOOK_SECRET=      # For webhook verification
 DAEMON_AUTH_TOKEN=          # Daemon authentication
 VAPID_PUBLIC_KEY=           # Web Push
 VAPID_PRIVATE_KEY=          # Web Push
-GITLAB_OAUTH_CLIENT_ID=     # better-auth
-GITLAB_OAUTH_CLIENT_SECRET= # better-auth
 AUTH_EMAIL_WHITELIST=       # Comma-separated emails
 ```
+
+ClickUp OAuth redirect URL (configure in ClickUp app):
+- `http://localhost:8787/api/auth/oauth2/callback/clickup` (dev)
+- `https://<worker-domain>/api/auth/oauth2/callback/clickup` (prod)
 
 ### Daemon Config
 
@@ -990,7 +1011,7 @@ AUTH_EMAIL_WHITELIST=       # Comma-separated emails
 
 - [ ] ClickUp webhooks (reduce polling)
 - [ ] ClickUp write-back (update status, add MR links as comments)
-- [ ] Multi-user support (team members can view, only Andriy approves)
+- [ ] Roles/permissions (viewer vs approver)
 - [ ] CI runner mode (ephemeral runners instead of daemon)
 - [ ] Auto-split large tasks into subtasks
 - [ ] Pre-commit secret scanning
