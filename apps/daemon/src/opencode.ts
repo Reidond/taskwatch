@@ -105,7 +105,7 @@ Please revise the plan based on the feedback above.
 		prompt += `
 ## Instructions
 
-Create a plan with:
+Create a SPEC.md like plan with:
 1. **Assumptions** - List any assumptions you're making about requirements or implementation
 2. **Approach** - Describe the technical approach step by step
 3. **File Changes** - List expected file modifications per repository
@@ -114,7 +114,7 @@ Format your response as JSON:
 \`\`\`json
 {
   "assumptions": "markdown text",
-  "approach": "markdown text", 
+  "approach": "markdown text",
   "fileChanges": {
     "repo-name": ["path/to/file1.ts", "path/to/file2.ts"]
   }
